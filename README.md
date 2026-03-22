@@ -58,4 +58,9 @@ Ensure you have Python 3.8+ installed.
 - `winequalityN.csv`: The dataset powering the models and EDA diagnostics.
 
 ---
-*Developed by Pratham Arun*
+## 👥 Team Members
+
+This project was brought to life by the following contributors:
+- **Sparsh Mishra** - [GitHub Profile](https://github.com/mishrasparsh64-debug/Sparsh-Mishra)
+- **Ajeet Singh Rawat** - [GitHub Profile](https://github.com/ajeetsinghrawat)
+- **Pratham Arun** - [GitHub Profile](https://github.com/Pratham-Arun)
