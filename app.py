@@ -232,6 +232,51 @@ elif page == "About":
                 "**Scikit-Learn:** Preprocessing, model development, and validation.\n\n"
                 "**XGBoost:** High-accuracy gradient boosting ensemble.")
 
+    st.markdown("---")
+    st.markdown("### 🍷 Understanding the Chemistry")
+    st.write("The system analyzes 11 key physicochemical parameters to determine wine quality:")
+    
+    param_col1, param_col2 = st.columns(2)
+    
+    with param_col1:
+        st.markdown("""
+        **1. Fixed Acidity**  
+        Non-volatile acids (primarily tartaric) that provide the foundational tartness and structural backbone.
+        
+        **2. Volatile Acidity**  
+        A measure of acetic acid; critical for aroma at low levels but leads to a vinegar-like defect if high.
+        
+        **3. Citric Acid**  
+        Acts as a natural preservative and enhances the wine's "freshness" and flavor profile.
+        
+        **4. Residual Sugar**  
+        The sugar remaining after fermentation; essential for balancing acidity and body.
+        
+        **5. Chlorides**  
+        The amount of salt in the wine, influencing the perceived "savouriness" and mouthfeel.
+        
+        **6. Alcohol Content**  
+        The percentage of alcohol by volume, directly impacting the wine's body and warmth.
+        """)
+        
+    with param_col2:
+        st.markdown("""
+        **7. Free Sulfur Dioxide**  
+        The active form of SO₂ that protects the wine from oxidation and microbial spoilage.
+        
+        **8. Density**  
+        Closely tied to alcohol and sugar levels; reflects the overall viscosity of the wine.
+        
+        **9. pH Level**  
+        The scale of acidity (0-14); influences the wine's color, stability, and sensory balance.
+        
+        **10. Sulphates**  
+        A wine additive (Potassium Sulphate) that acts as an antioxidant and antimicrobial agent.
+        
+        **11. Wine Variant (Type)**  
+        The categorical distinction between Red and White variants, which significantly influences the chemical baseline.
+        """)
+
 elif page == "Model":
     st.markdown("<h1 class='main-title'>Intelligence Engine</h1>", unsafe_allow_html=True)
     st.markdown("<p class='sub-title'>Decoding the Wine Quality Classifier</p>", unsafe_allow_html=True)

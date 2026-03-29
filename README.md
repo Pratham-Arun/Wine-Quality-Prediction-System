@@ -43,7 +43,7 @@ Ensure you have Python 3.8+ installed.
    ```
 
 4. **Access the Web App:**
-   Open your browser and navigate to https://wine-quality-prediction-system.streamlit.app/.
+   Open your browser and navigate to `https://wine-quality-prediction-system.streamlit.app/`.
 
 ## 🧠 Machine Learning Pipeline
 
