@@ -6,10 +6,10 @@ This project explores the *Wine Quality* dataset, replacing subjective sensory t
 
 ## 🌟 Features
 
-- **Interactive Explorer:** Adjust 11 chemical properties (like Alcohol, pH, and Sulphates) and the Wine Type (Red/White) via intuitive sliders to simulate a wine profile and instantly calculate its predicted quality score.
-- **Dark Modern UI:** A fully styled, responsive, and professional dashboard interface.
-- **Performance Validation:** Side-by-side metric comparison against a baseline Logistic Regression model.
-- **Model Interpretability (Explainable AI):** Includes dataset diagnostics and SHAP (SHapley Additive exPlanations) summary plots to deconstruct the XGBoost ensemble, revealing exactly how each chemical property drives the final classification.
+- **Multi-Model Analytics:** Real-time performance benchmarking of **Logistic Regression**, **XGBoost**, and **Support Vector Machines (SVC)**.
+- **Dark Modern UI:** A fully styled, responsive, and professional dashboard interface built for high-contrast data visualization.
+- **Deep Insights:** Comprehensive dataset diagnostics, including correlation matrices and target distribution analysis.
+- **Explainable AI (XAI):** Integrated SHAP (SHapley Additive exPlanations) to deconstruct model decisions and identify the key chemical properties driving wine quality.
 
 ## 🚀 Live Demo
 You can deploy this instantly on Streamlit Community Cloud:
@@ -47,10 +47,10 @@ Ensure you have Python 3.8+ installed.
 
 ## 🧠 Machine Learning Pipeline
 
-- **Dataset:** Contains physicochemical tests of red and white variants of Portuguese "Vinho Verde" wine. 
-- **Target Variable:** Binary classification mapping scores to either **Standard Quality (0)** or **High Quality (1)**.
-- **Preprocessing:** Missing values imputed using the median strategy.
-- **Model:** Primary architecture is `XGBClassifier` evaluated against `LogisticRegression` for standard baselining.
+- **Dataset:** Contains physicochemical tests of red and white variants of "Vinho Verde" wine from northern Portugal.
+- **Target Variable:** Binary classification (scores > 5 are mapped to **High Quality (1)**, others to **Standard (0)**).
+- **Preprocessing:** Missing values imputed using the **Mean** strategy; features normalized using **MinMaxScaler**.
+- **Model Ensemble:** A comparative architecture featuring **Logistic Regression**, **XGBoost (XGBClassifier)**, and **Support Vector Classifier (SVC)**.
 
 ## 📂 Project Structure
 

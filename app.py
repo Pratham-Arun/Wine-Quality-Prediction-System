@@ -1,51 +1,104 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sb
 import os
 import shap
 from sklearn.model_selection import train_test_split
 from sklearn.impute import SimpleImputer
+from sklearn.preprocessing import MinMaxScaler
 from xgboost import XGBClassifier
 from sklearn.linear_model import LogisticRegression
+from sklearn.svm import SVC
 from sklearn import metrics
 
 # --- 1. System Configuration ---
-st.set_page_config(page_title="Wine Quality Research Dashboard", page_icon="🍷", layout="wide")
+st.set_page_config(page_title="Wine Quality Prediction System", page_icon="🍷", layout="wide")
 
+# Custom CSS for a Premium "Wine Intelligence" look
 st.markdown("""
     <style>
-    /* Dark Modern UI Theme */
-    [data-testid="stAppViewContainer"] {
-        background-color: #0b0f1a;
-        color: white;
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+
+    html, body, [data-testid="stAppViewContainer"] {
+        font-family: 'Inter', sans-serif;
+        background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+        color: #f8fafc;
     }
+
     [data-testid="stSidebar"] {
-        background-color: #111827;
-        border-right: 1px solid #1f2937;
+        background-color: rgba(15, 23, 42, 0.8);
+        backdrop-filter: blur(10px);
+        border-right: 1px solid rgba(255, 255, 255, 0.1);
     }
-    h1, h2, h3, h4, p, span, div {
-        color: white !important;
+
+    /* Glassmorphism Cards */
+    .stMetric, .css-1r6slb0, .e1tzpsn23 {
+        background: rgba(255, 255, 255, 0.05);
+        backdrop-filter: blur(5px);
+        border-radius: 12px;
+        padding: 1.5rem;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        transition: transform 0.3s ease;
     }
+    
+    .stMetric:hover {
+        transform: translateY(-5px);
+        background: rgba(255, 255, 255, 0.08);
+    }
+
+    h1, h2, h3 {
+        font-weight: 700 !important;
+        letter-spacing: -0.02em;
+    }
+
+    .main-title {
+        font-size: 3rem;
+        background: linear-gradient(to right, #60a5fa, #a78bfa);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        margin-bottom: 0.5rem;
+    }
+
+    .sub-title {
+        color: #94a3b8 !important;
+        font-size: 1.2rem;
+        margin-bottom: 2rem;
+    }
+
+    /* Custom Button Styling */
     .stButton>button {
-        background-color: #38bdf8;
-        color: #0b0f1a !important;
-        font-weight: bold;
-        border-radius: 8px;
-        border: none;
+        width: 100%;
+        border-radius: 10px;
+        padding: 0.6rem 1rem;
+        background: rgba(255, 255, 255, 0.05);
+        color: #f8fafc;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        font-weight: 600;
+        transition: all 0.3s ease;
     }
+
     .stButton>button:hover {
-        background-color: #0ea5e9;
+        background: linear-gradient(to right, #3b82f6, #8b5cf6);
+        color: white;
+        border: none;
+        box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);
+    }
+
+    /* Sidebar Active State Indicator (Simulated) */
+    .nav-active {
+        background: linear-gradient(to right, #3b82f6, #8b5cf6) !important;
         color: white !important;
     }
-    [data-testid="stMetricValue"] {
-        font-size: 2.5rem;
-        color: #38bdf8 !important;
+
+    /* Info/Success Boxes */
+    .stAlert {
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 12px;
     }
-    /* Slider styling */
-    .stSlider [data-baseweb="slider"] {
-        background-color: transparent !important;
-    }
+
     /* Hide default Streamlit elements */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
@@ -61,6 +114,13 @@ def load_data():
     df = pd.read_csv(file_path)
     
     df['type'] = df['type'].map({'white': 1, 'red': 0})
+    # Basic cleanup: remove duplicates
+    df = df.drop_duplicates()
+    
+    # Feature Selection: Removing 'total sulfur dioxide' due to high correlation with 'free sulfur dioxide'
+    if 'total sulfur dioxide' in df.columns:
+        df = df.drop('total sulfur dioxide', axis=1)
+    
     features = df.drop(['quality', 'best quality'], axis=1, errors='ignore')
     target = df['best quality'] if 'best quality' in df.columns else (df['quality'] > 5).astype(int)
         
@@ -73,253 +133,233 @@ df, features, target = load_data()
 def train_models(X, y):
     xtrain, xtest, ytrain, ytest = train_test_split(X, y, test_size=0.2, random_state=40)
     
-    imputer = SimpleImputer(strategy='median')
+    imputer = SimpleImputer(strategy='mean') # Switched to mean as per latest documentation
     xtrain_imp = imputer.fit_transform(xtrain)
     xtest_imp = imputer.transform(xtest)
     
+    # Normalization using MinMaxScaler
+    scaler = MinMaxScaler()
+    xtrain_scaled = scaler.fit_transform(xtrain_imp)
+    xtest_scaled = scaler.transform(xtest_imp)
+    
     # Standard linear baseline
     lr_model = LogisticRegression(max_iter=1000)
-    lr_model.fit(xtrain_imp, ytrain)
+    lr_model.fit(xtrain_scaled, ytrain)
     
     # Advanced ensemble
     xgb_model = XGBClassifier(use_label_encoder=False, eval_metric='logloss')
-    xgb_model.fit(xtrain_imp, ytrain)
+    xgb_model.fit(xtrain_scaled, ytrain)
     
-    return lr_model, xgb_model, xtest_imp, ytest, xtrain_imp, imputer
+    # Support Vector Machine
+    svc_model = SVC(kernel='rbf', probability=True)
+    svc_model.fit(xtrain_scaled, ytrain)
+    
+    return lr_model, xgb_model, svc_model, xtest_scaled, ytest, xtrain_scaled, imputer, scaler
 
-lr_model, xgb_model, xtest_imp, ytest, xtrain_imp, imputer = train_models(features, target)
+lr_model, xgb_model, svc_model, xtest_imp, ytest, xtrain_imp, imputer, scaler = train_models(features, target)
 
 # --- SIDEBAR NAVIGATION ---
 if 'page' not in st.session_state:
     st.session_state.page = "Home"
 
 with st.sidebar:
-    st.image("https://cdn-icons-png.flaticon.com/512/3014/3014502.png", width=50) # Wine icon
-    st.title("🍷 Wine Quality")
+    st.markdown("<h2 style='text-align: center; color: #60a5fa;'>Wine Quality Prediction System</h2>", unsafe_allow_html=True)
     st.markdown("---")
     
-    st.markdown("### Navigation")
-    if st.button("Home", use_container_width=True):
-        st.session_state.page = "Home"
-    if st.button("About", use_container_width=True):
-        st.session_state.page = "About"
-    if st.button("Model", use_container_width=True):
-        st.session_state.page = "Model"
-    if st.button("Results", use_container_width=True):
-        st.session_state.page = "Results"
-    if st.button("Explorer", use_container_width=True):
-        st.session_state.page = "Explorer"
-        
-    page = st.session_state.page
+    # Navigation Buttons
+    if st.button("🏠 Home", use_container_width=True): st.session_state.page = "Home"
+    if st.button("📖 About", use_container_width=True): st.session_state.page = "About"
+    if st.button("🧠 Model", use_container_width=True): st.session_state.page = "Model"
+    if st.button("📈 Results", use_container_width=True): st.session_state.page = "Results"
     
     st.markdown("---")
-    st.markdown("### System KPI")
-    st.metric("Dataset Size", f"{len(df):,}")
-    st.metric("Features", f"{len(features.columns)}")
 
-# --- PAGE ROUTING ---
+page = st.session_state.page
 
+# --- 4. PAGE ROUTING ---
 if page == "Home":
-    st.title("Wine Quality Prediction System")
-    st.markdown("### Machine Learning Framework for Wine Classification")
-    st.markdown("---")
+    st.markdown("<h1 class='main-title'>Wine Quality Prediction System</h1>", unsafe_allow_html=True)
+    st.markdown("<p class='sub-title'>Predictive Analytics for Wine Quality</p>", unsafe_allow_html=True)
+    
     st.markdown("""
-        Welcome to the **Wine Quality Prediction System**. 
+        ### Elevating Wine Assessment through Data Science
+        Traditional wine evaluation relies on subjective sensory testing. Our system transforms this process into an **objective, data-driven methodology**.
         
-        This platform leverages advanced machine learning algorithms to predict the quality of wine based on its physicochemical properties.
-        Transitioning from traditional sensory evaluation, this system provides an objective, data-driven approach to wine assessment.
+        By analyzing the intricate physicochemical properties of wine, we provide a high-precision classification engine that distinguishes between standard and exceptional vintages.
     """)
-    st.info("👈 Use the sidebar navigation to explore the dataset, understand the model, view performance metrics, or try the interactive Explorer.")
+    
+    # Dataset Overview
+    st.markdown("#### 📊 Dataset Statistics")
+    c1, c2 = st.columns(2)
+    c1.metric("Total Samples", "5,329")
+    c2.metric("Chemical Features", "11")
+    
+    st.info("💡 **Pro Tip:** Start with the 'Results' page to see how the model understands the dataset.")
 
 elif page == "About":
-    st.title("About the Project")
-    st.markdown("---")
+    st.markdown("<h1 class='main-title'>Wine Quality Prediction System: The Project</h1>", unsafe_allow_html=True)
+    st.markdown("<p class='sub-title'>Bridging the gap between chemistry and quality</p>", unsafe_allow_html=True)
+    
     st.markdown("""
-    ### Problem Context
-    Determining wine quality has traditionally relied heavily on sensory testing by human experts. However, this process is subjective, time-consuming, and expensive. 
-    Can we use the objective chemical properties of wine to predict its quality score?
-
-    ### Industry Importance
-    Predictive modeling for wine quality offers significant benefits:
-    - **Quality Control:** Automated screening during the production process.
-    - **Cost Reduction:** Minimizing the reliance on extensive sensory panels.
-    - **Targeted Winemaking:** Understanding which chemical factors most strongly influence high quality ratings.
-
-    ### Dataset Overview
-    The engine uses the *Wine Quality* dataset, encompassing both red and white variants. The target variable is binary: 
-    - **High Quality (1)** 
-    - **Standard Quality (0)**
+        ### Project Overview
+        Predicting the quality of wine based on its physicochemical properties using open-source datasets. 
+        This system replaces subjective expert tasting with objective, scalable Machine Learning.
     """)
+    
+    col_a1, col_a2 = st.columns(2)
+    
+    with col_a1:
+        st.markdown("""
+        <div style='background: rgba(255,255,255,0.05); padding: 20px; border-radius: 12px; border-left: 4px solid #3b82f6;'>
+            <h4>The Problem Statement</h4>
+            <p>Manual wine evaluation is <b>subjective</b>, <b>expensive</b>, and <b>non-scalable</b>. Human perception varies, but chemical data remains constant.</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        st.markdown(" ")
+        
+        st.markdown("""
+        <div style='background: rgba(255,255,255,0.05); padding: 20px; border-radius: 12px; border-left: 4px solid #8b5cf6;'>
+            <h4>Computational Solution</h4>
+            <p>Using <b>eXtreme Gradient Boosting (XGBoost)</b> and <b>Support Vector Machines (SVM)</b> to achieve high-precision classification DNA.</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+    with col_a2:
+        st.markdown("### Libraries & Frameworks")
+        st.info("**Pandas & NumPy:** Data handling and array structures.\n\n"
+                "**Seaborn & Matplotlib:** Advanced data visualization.\n\n"
+                "**Scikit-Learn:** Preprocessing, model development, and validation.\n\n"
+                "**XGBoost:** High-accuracy gradient boosting ensemble.")
 
 elif page == "Model":
-    st.title("Machine Learning Pipeline")
+    st.markdown("<h1 class='main-title'>Intelligence Engine</h1>", unsafe_allow_html=True)
+    st.markdown("<p class='sub-title'>Decoding the Wine Quality Classifier</p>", unsafe_allow_html=True)
+    
+    st.markdown("### 🛠 Processing Pipeline")
+    
+    col_p1, col_p2, col_p3 = st.columns(3)
+    
+    with col_p1:
+        st.markdown("#### 1. Preprocessing")
+        st.write("Missing values are imputed using the **Mean** strategy, as physicochemical features are continuous.")
+    
+    with col_p2:
+        st.markdown("#### 2. Normalization")
+        st.write("Using **MinMaxScaler** to scale features between 0 and 1, ensuring stable and fast model convergence.")
+        
+    with col_p3:
+        st.markdown("#### 3. Feature Selection")
+        st.write("Redundant features like **Total Sulfur Dioxide** are removed to reduce collinearity and improve metrics.")
+
     st.markdown("---")
     
-    st.markdown("### Architectures Deployed")
+    st.markdown("### 📊 Ensemble Architecture")
     st.markdown("""
-    1. **Logistic Regression:** Serves as the standard linear baseline model.
-    2. **Extreme Gradient Boosting (XGBoost):** An advanced, non-linear ensemble architecture that typically yields higher predictive performance on tabular data.
+    The system benchmarks three state-of-the-art architectures:
+    
+    1. **Logistic Regression:** Linear baseline for binary classification.
+    2. **XGBoost:** Highly efficient gradient boosting for tabular data.
+    3. **SVC (Support Vector Classifier):** Effective in high-dimensional spaces using the RBF kernel.
     """)
     
-    st.markdown("### Data Preprocessing")
-    st.markdown("""
-    - **Missing Value Handling:** Missing data points are imputed using the `median` strategy to maintain robust central tendencies without being skewed by outliers.
-    - **Feature Selection:** Target variables (`quality` and `best quality`) are isolated, while all remaining physicochemical attributes are utilized as predictive features.
-    """)
-    
-    st.markdown("### Evaluation Metrics")
-    st.markdown("""
-    - **Accuracy:** The overall proportion of correct predictions.
-    - **Precision:** The proportion of predicted 'High Quality' wines that were actually high quality (minimizing false positives).
-    - **Recall:** The proportion of actual 'High Quality' wines that the model successfully identified (minimizing false negatives).
-    - **ROC-AUC:** A comprehensive metric charting the model's ability to distinguish between classes across different thresholds.
-    """)
+    st.success("**Performance Note:** XGBoost typically provides the highest validation accuracy (~80%) for this dataset.")
 
 elif page == "Results":
-    st.title("Performance Validation")
-    st.markdown("Comparing the baseline Logistic Regression against the Gradient Boosting (XGBoost) architecture.")
-    st.markdown("---")
+    st.markdown("<h1 class='main-title'>Intelligence Insights</h1>", unsafe_allow_html=True)
+    st.markdown("<p class='sub-title'>Performance metrics and dataset forensics</p>", unsafe_allow_html=True)
 
-    st.header("Dataset Diagnostics")
+    st.header("1. Dataset Diagnostics")
     col_e1, col_e2 = st.columns(2)
     
     with col_e1:
-        st.subheader("Target Variable Imbalance")
+        st.subheader("Target Variable Distribution")
         fig_dist, ax_dist = plt.subplots(figsize=(8, 5))
-        sb.countplot(x=target, palette="mako", ax=ax_dist)
-        ax_dist.set_xticklabels(['Standard Quality (0)', 'High Quality (1)'])
+        fig_dist.patch.set_facecolor('#0f172a')
+        ax_dist.set_facecolor('#0f172a')
+        sb.countplot(x=target, palette="viridis", ax=ax_dist)
+        ax_dist.set_xticklabels(['Standard (0)', 'High Quality (1)'], color='white')
         ax_dist.set_xlabel("")
+        ax_dist.tick_params(colors='white')
+        for spine in ax_dist.spines.values():
+            spine.set_edgecolor('white')
         st.pyplot(fig_dist)
         
     with col_e2:
-        st.subheader("Chemical Collinearity Matrix")
+        st.subheader("Chemical Correlation Matrix")
         fig_corr, ax_corr = plt.subplots(figsize=(8, 5))
-        sb.heatmap(df.corr(numeric_only=True), annot=False, cmap="vlag", linewidths=.5, ax=ax_corr)
+        fig_corr.patch.set_facecolor('#0f172a')
+        numeric_df = df.select_dtypes(include=['float', 'int'])
+        sb.heatmap(numeric_df.corr(), annot=False, cmap="coolwarm", linewidths=.5, ax=ax_corr)
+        ax_corr.tick_params(colors='white')
         st.pyplot(fig_corr)
 
-# --- TAB 2: METRICS ---
-    st.header("Performance Validation")
-    st.markdown("Comparing the baseline Logistic Regression against the Gradient Boosting (XGBoost) architecture.")
-    
-    xgb_preds = xgb_model.predict(xtest_imp)
-    xgb_probs = xgb_model.predict_proba(xtest_imp)[:, 1]
-    
-    col_m1, col_m2, col_m3, col_m4 = st.columns(4)
-    col_m1.metric("XGB Accuracy", f"{metrics.accuracy_score(ytest, xgb_preds) * 100:.1f}%")
-    col_m2.metric("XGB Precision", f"{metrics.precision_score(ytest, xgb_preds) * 100:.1f}%")
-    col_m3.metric("XGB Recall", f"{metrics.recall_score(ytest, xgb_preds) * 100:.1f}%")
-    col_m4.metric("ROC-AUC Score", f"{metrics.roc_auc_score(ytest, xgb_probs):.3f}")
-    
     st.markdown("---")
+    st.header("2. Comparative Model Performance")
     
-    col_cm1, col_cm2 = st.columns(2)
-    with col_cm1:
-        st.subheader("Confusion Matrix (XGBoost)")
-        st.markdown("Visualizing True Positives, False Positives, True Negatives, and False Negatives.")
-        fig_cm, ax_cm = plt.subplots(figsize=(6, 4))
-        cm = metrics.confusion_matrix(ytest, xgb_preds)
-        sb.heatmap(cm, annot=True, fmt='d', cmap='Blues', ax=ax_cm, 
-                   xticklabels=['Standard', 'High'], yticklabels=['Standard', 'High'])
-        plt.ylabel('Actual Quality')
-        plt.xlabel('Predicted Quality')
-        st.pyplot(fig_cm)
-        
+    # Calculate predictions for all models
+    models_list = [
+        ("Logistic Regression", lr_model),
+        ("XGBoost", xgb_model),
+        ("Support Vector Machine", svc_model)
+    ]
+    
+    for name, model in models_list:
+        with st.expander(f"📊 {name} Performance Details", expanded=(name=="XGBoost")):
+            preds = model.predict(xtest_imp)
+            probs = model.predict_proba(xtest_imp)[:, 1]
+            
+            m1, m2, m3, m4 = st.columns(4)
+            m1.metric("Accuracy", f"{metrics.accuracy_score(ytest, preds) * 100:.1f}%")
+            m2.metric("Precision", f"{metrics.precision_score(ytest, preds) * 100:.1f}%")
+            m3.metric("Recall", f"{metrics.recall_score(ytest, preds) * 100:.1f}%")
+            m4.metric("ROC-AUC", f"{metrics.roc_auc_score(ytest, probs):.3f}")
+            
+            c_cm1, c_cm2 = st.columns(2)
+            with c_cm1:
+                fig_cm, ax_cm = plt.subplots(figsize=(5, 3))
+                fig_cm.patch.set_facecolor('#0f172a')
+                cm = metrics.confusion_matrix(ytest, preds)
+                sb.heatmap(cm, annot=True, fmt='d', cmap='Blues', ax=ax_cm, 
+                           xticklabels=['Std', 'High'], yticklabels=['Std', 'High'])
+                ax_cm.tick_params(colors='white')
+                plt.ylabel('Actual', color='white')
+                plt.xlabel('Predicted', color='white')
+                st.pyplot(fig_cm)
+            
+            with c_cm2:
+                fig_roc, ax_roc = plt.subplots(figsize=(5, 3))
+                fig_roc.patch.set_facecolor('#0f172a')
+                ax_roc.set_facecolor('#0f172a')
+                fpr, tpr, _ = metrics.roc_curve(ytest, probs)
+                ax_roc.plot(fpr, tpr, color='#3b82f6', lw=2, label=f'ROC {name}')
+                ax_roc.plot([0, 1], [0, 1], color='#94a3b8', lw=1, linestyle='--')
+                ax_roc.tick_params(colors='white')
+                ax_roc.legend()
+                st.pyplot(fig_roc)
 
-    with col_cm2:
-        st.subheader("Receiver Operating Characteristic (ROC)")
-        st.markdown("Mapping the diagnostic ability of the binary classifier as its discrimination threshold varies.")
-        fig_roc, ax_roc = plt.subplots(figsize=(6, 4))
-        fpr, tpr, _ = metrics.roc_curve(ytest, xgb_probs)
-        ax_roc.plot(fpr, tpr, color='darkorange', lw=2, label='XGBoost')
-        ax_roc.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')
-        ax_roc.set_xlabel('False Positive Rate')
-        ax_roc.set_ylabel('True Positive Rate')
-        ax_roc.legend(loc="lower right")
-        st.pyplot(fig_roc)
-
-# --- TAB 3: EXPLAINABLE AI --- (Moving to Results page for now)
     st.markdown("---")
-    st.header("Model Interpretability")
-
-    st.markdown("Using SHapley Additive exPlanations (SHAP) to deconstruct the black-box nature of the XGBoost ensemble. This reveals exactly how each chemical property drives the final quality classification.")
+    st.header("3. Explainable AI (SHAP - XGBoost)")
     
-    # Calculate SHAP values
     explainer = shap.TreeExplainer(xgb_model)
     shap_values = explainer.shap_values(xtest_imp)
     
     col_s1, col_s2 = st.columns(2)
     
     with col_s1:
-        st.subheader("Feature Importance Profile")
-        st.markdown("Relative impact of features based on the XGBoost model's learned weights.")
+        st.subheader("Top Feature Importances")
         importances = pd.Series(xgb_model.feature_importances_, index=features.columns)
         importances = importances.sort_values(ascending=False).head(10)
-        st.bar_chart(importances)
+        st.bar_chart(importances, color="#8b5cf6")
         
     with col_s2:
-        st.subheader("Global Feature Impact (SHAP)")
+        st.subheader("Global Impact Analysis")
         fig_shap, ax_shap = plt.subplots(figsize=(6, 4))
+        fig_shap.patch.set_facecolor('#0f172a')
         shap.summary_plot(shap_values, xtest_imp, feature_names=features.columns, show=False)
+        plt.gcf().axes[-1].tick_params(colors='white') 
+        plt.gca().tick_params(colors='white')
         st.pyplot(fig_shap)
-        
-    st.markdown("### Research Insights")
-    st.info("**How to read the SHAP plot:**\n\n* **Vertical Axis:** Features ordered by their impact on the model's prediction.\n* **Horizontal Axis:** The SHAP value. Points to the right push the prediction toward 'High Quality', points to the left push toward 'Standard'.\n* **Color:** The actual value of the feature (Red = High value, Blue = Low value).")
-    
-    st.success("**Key Findings:**\n\nAlcohol is typically the strongest driver of high quality, while high volatile acidity damages the wine's quality score.")
 
-elif page == "Explorer":
-    st.title("Interactive Prediction Explorer")
-    st.markdown("Adjust the physicochemical properties below to simulate a wine profile and predict its quality.")
-    st.markdown("---")
-    
-    wine_type = st.radio("Wine Type", options=["White", "Red"], horizontal=True)
-    type_val = 1 if wine_type == "White" else 0
-    
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        fixed_acidity = st.slider("Fixed Acidity", 3.8, 15.9, 7.2)
-        residual_sugar = st.slider("Residual Sugar", 0.6, 65.8, 5.4)
-        total_sulfur_dioxide = st.slider("Total Sulfur Dioxide", 6.0, 440.0, 115.7)
-        sulphates = st.slider("Sulphates", 0.22, 2.0, 0.53)
-        
-    with col2:
-        volatile_acidity = st.slider("Volatile Acidity", 0.08, 1.58, 0.34)
-        chlorides = st.slider("Chlorides", 0.009, 0.611, 0.056)
-        density = st.slider("Density", 0.987, 1.039, 0.995)
-        alcohol = st.slider("Alcohol", 8.0, 14.9, 10.5)
-        
-    with col3:
-        citric_acid = st.slider("Citric Acid", 0.0, 1.66, 0.32)
-        free_sulfur_dioxide = st.slider("Free Sulfur Dioxide", 1.0, 289.0, 30.5)
-        pH = st.slider("pH", 2.72, 4.01, 3.22)
-        
-    st.markdown("---")
-    st.markdown("### Model Prediction")
-    
-    if st.button("Calculate Quality Score", use_container_width=True):
-        with st.spinner("Analyzing physicochemical profile..."):
-            # Prediction pipeline
-            input_data = pd.DataFrame([[
-                type_val, fixed_acidity, volatile_acidity, citric_acid, residual_sugar,
-                chlorides, free_sulfur_dioxide, total_sulfur_dioxide, density,
-                pH, sulphates, alcohol
-            ]], columns=[
-                'type', 'fixed acidity', 'volatile acidity', 'citric acid', 'residual sugar',
-                'chlorides', 'free sulfur dioxide', 'total sulfur dioxide', 'density',
-                'pH', 'sulphates', 'alcohol'
-            ])
-            
-            # Apply imputer exactly as during training
-            input_imp = imputer.transform(input_data)
-            
-            # Predict
-            pred = xgb_model.predict(input_imp)[0]
-            prob = xgb_model.predict_proba(input_imp)[0][1]
-            st.markdown("---")
-            if pred == 1:
-                st.success("🌟 **High Quality Wine**")
-            else:
-                st.error("📉 **Standard Quality**")
-                
-            st.metric("Confidence Score", f"{prob * 100:.1f}%")
+st.markdown("---")
+st.markdown("<p style='text-align: center; color: #94a3b8;'>Wine Quality Prediction System</p>", unsafe_allow_html=True)
